@@ -507,6 +507,9 @@ class Navigation(metaclass=Singleton):
             return False
 
     def StartNavigation(self, tracker, icp):
+
+        import cProfile
+        import pstats
         # initialize jobs list
         jobs_list = []
 
@@ -657,23 +660,41 @@ class Navigation(metaclass=Singleton):
                         self.plot_efield_vectors,
                     )
                 )
-
-            jobs_list.append(
-                UpdateNavigationScene(
-                    vis_queues=vis_queues,
-                    vis_components=vis_components,
-                    event=self.event,
-                    sle=self.sleep_nav,
-                    neuronavigation_api=self.neuronavigation_api,
-                )
+        nav_scene_thread = UpdateNavigationScene(
+                vis_queues=vis_queues,
+                vis_components=vis_components,
+                event=self.event,
+                sle=self.sleep_nav,
+                neuronavigation_api=self.neuronavigation_api,
             )
 
-            for jobs in jobs_list:
-                # jobs.daemon = True
-                jobs.start()
-                # del jobs
+        profiler = cProfile.Profile()
 
-            self.pedal_connector.add_callback("navigation", self.PedalStateChanged)
+        original_run = nav_scene_thread.run
+        def profiled_run():
+            profiler.enable()
+            original_run()
+            profiler.disable()
+
+        nav_scene_thread.run = profiled_run
+        jobs_list.append(nav_scene_thread)
+
+        # Start all threads
+        for jobs in jobs_list:
+            jobs.start()
+
+        def stop_profiling(event):
+            print("Profile results for UpdateNavigationScene.run():")
+            stats = pstats.Stats(profiler).sort_stats("cumulative")
+            stats.print_stats(50)
+            timer.Stop()  # Stop the timer
+        timer = wx.Timer()
+        timer.Bind(wx.EVT_TIMER, stop_profiling)
+        timer.Start(30000, oneShot=True)  # 30,000ms = 30s, one-shot
+
+        print("Profiling UpdateNavigationScene.run() for 30 seconds (GUI stays alive)...")
+
+        self.pedal_connector.add_callback("navigation", self.PedalStateChanged)
 
     def StopNavigation(self):
         self.event.set()

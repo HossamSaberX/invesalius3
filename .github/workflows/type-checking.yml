@@ -1,0 +1,61 @@
+name: Mypy Check
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  mypy-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install system dependencies for wxPython
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libjpeg-dev \
+            libpng-dev \
+            libtiff-dev \
+            freeglut3-dev \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev \
+            libsdl2-dev \
+            libsm-dev \
+            build-essential
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install mypy==1.10.0
+          pip install types-requests types-PyYAML
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            pip install wxPython==4.2.2 numpy scipy nibabel matplotlib pydicom
+          fi
+
+      - name: Get changed files
+        id: changed-files
+        run: |
+          echo "FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep '\.py$' | tr '\n' ' ')" >> $GITHUB_OUTPUT
+
+      - name: Run Mypy on changed files
+        run: |
+          if [ -n "${{ steps.changed-files.outputs.FILES }}" ]; then
+            echo "Running mypy on: ${{ steps.changed-files.outputs.FILES }}"
+            mypy --config-file=mypy.ini ${{ steps.changed-files.outputs.FILES }}
+          else
+            echo "No Python files changed, skipping mypy"
+          fi
