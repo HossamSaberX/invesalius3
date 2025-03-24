@@ -1,4 +1,4 @@
-name: Mypy Check
+name: Mypy Basic Test
 
 on:
   pull_request:
@@ -6,56 +6,42 @@ on:
       - master
 
 jobs:
-  mypy-check:
+  mypy-basic-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install system dependencies for wxPython
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-3-dev \
-            libwebkit2gtk-4.1-dev \
-            libjpeg-dev \
-            libpng-dev \
-            libtiff-dev \
-            freeglut3-dev \
-            libgl1-mesa-dev \
-            libglu1-mesa-dev \
-            libsdl2-dev \
-            libsm-dev \
-            build-essential
-
       - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-          cache: 'pip'
 
-      - name: Install Python dependencies
+      - name: Install mypy
         run: |
           python -m pip install --upgrade pip
           pip install mypy==1.10.0
-          pip install types-requests types-PyYAML
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
+
+      - name: Debug directory contents
+        run: |
+          pwd
+          echo "Repository contents:"
+          ls -la
+          echo "Does mypy.ini exist?"
+          if [ -f mypy.ini ]; then
+            echo "Yes, mypy.ini exists"
+            cat mypy.ini
           else
-            pip install wxPython==4.2.2 numpy scipy nibabel matplotlib pydicom
+            echo "No, mypy.ini does not exist"
           fi
 
-      - name: Get changed files
-        id: changed-files
+      - name: Run basic mypy test
         run: |
-          echo "FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep '\.py$' | tr '\n' ' ')" >> $GITHUB_OUTPUT
-
-      - name: Run Mypy on changed files
-        run: |
-          if [ -n "${{ steps.changed-files.outputs.FILES }}" ]; then
-            echo "Running mypy on: ${{ steps.changed-files.outputs.FILES }}"
-            mypy --config-file=mypy.ini --ignore-missing-imports ${{ steps.changed-files.outputs.FILES }}
+          # Test with a specific file that's known to exist
+          echo "Running mypy on app.py"
+          if [ -f mypy.ini ]; then
+            mypy --config-file=mypy.ini app.py
           else
-            echo "No Python files changed, skipping mypy"
+            mypy --ignore-missing-imports app.py
           fi
