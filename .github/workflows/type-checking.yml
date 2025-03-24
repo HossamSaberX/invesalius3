@@ -55,7 +55,7 @@ jobs:
         run: |
           if [ -n "${{ steps.changed-files.outputs.FILES }}" ]; then
             echo "Running mypy on: ${{ steps.changed-files.outputs.FILES }}"
-            mypy --config-file=mypy.ini --ignore-missing-imports ${{ steps.changed-files.outputs.FILES }}
+            mypy --config-file=mypy.ini ${{ steps.changed-files.outputs.FILES }}
           else
             echo "No Python files changed, skipping mypy"
           fi
